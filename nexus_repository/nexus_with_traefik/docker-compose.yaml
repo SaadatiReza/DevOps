@@ -1,0 +1,72 @@
+services:
+  reverse-proxy:
+    restart: always
+    image: ${TRAEFIK_IMAGE}
+    command:
+      - --log.level=DEBUG
+      - --log.filepath=/log-file.log
+      - --log.format=json
+      - --api=true
+      - --ping=true
+      - --accesslog=true
+      - --accesslog.bufferingsize=100
+      - --api.insecure=true
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${NETWORK_NAME}
+      - --entrypoints.http.address=:80
+      - --entryPoints.web.transport.respondingTimeouts.readTimeout=3600
+      - --entryPoints.name.transport.respondingTimeouts.writeTimeout=3600
+      - --entryPoints.web.transport.respondingTimeouts.idleTimeout=3600
+      - --entryPoints.name.transport.lifeCycle.requestAcceptGraceTimeout=3600
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - traefik-dynamic:/etc/traefik/dynamic
+    networks:
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${NETWORK_NAME}"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST}`)"
+      - "traefik.http.services.traefik-secure.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=4000000000"
+      - "traefik.http.middlewares.limit.buffering.maxResponseBodyBytes=4000000000"
+      - "traefik.http.middlewares.limit.buffering.memResponseBodyBytes=2000000"
+      - "traefik.http.middlewares.limit.buffering.memRequestBodyBytes=2000000"
+
+  nexus:
+    image: ${NEXUS_IMAGE}
+    volumes:
+      - nexus-data:/sonatype-work
+    dns:
+      - ${DNS1}
+      - ${DNS2}
+    networks:
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${NETWORK_NAME}"
+      - "traefik.http.routers.nexus.entrypoints=http"
+      - "traefik.http.routers.nexus.rule=Host(`${NEXUS_HOST}`)"
+      - "traefik.http.routers.nexus.service=nexus-web"
+      - "traefik.http.services.nexus-web.loadbalancer.server.port=8081"
+      - "traefik.http.routers.registry.entrypoints=http"
+      - "traefik.http.routers.registry.rule=Host(`${REGISTRY_HOST}`)"
+      - "traefik.http.routers.registry.service=repo-registry"
+      - "traefik.http.services.repo-registry.loadbalancer.server.port=5005"
+      - "traefik.http.routers.nexusdocker.entrypoints=http"
+      - "traefik.http.routers.nexusdocker.rule=Host(`${DOCKER_HOST}`)"
+      - "traefik.http.routers.nexusdocker.service=nexusdocker-secure"
+      - "traefik.http.services.nexusdocker-secure.loadbalancer.server.port=5002"
+
+networks:
+  default:
+    name: ${DEFAULT_NETWORK}
+
+volumes:
+  nexus-data: {}
+  traefik-dynamic: {}
+  nexus-data: {}
