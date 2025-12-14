@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    hostname: postgres
+    environment:
+      POSTGRES_USER: metabase
+      POSTGRES_DB: metabaseappdb
+      POSTGRES_PASSWORD: metabase
+    volumes:
+      - postgre_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+networks:
+  app_net:
+    driver: bridge
+    external: true
+
+volumes:
+  postgre_data:
